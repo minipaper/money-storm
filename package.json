@@ -5,24 +5,39 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "babel-node src/index.js",
-    "build": "babel src --out-dir dist"
+    "build": "babel src --out-dir dist",
+    "lint": "eslint -c .eslintrc.json src/**",
+    "lint:fix": "eslint --fix -c .eslintrc.json src/**"
   },
   "keywords": [
     "upbit"
   ],
   "author": "seongmin",
   "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "crypto": "^1.0.1",
+    "dotenv": "^8.2.0",
+    "jsonwebtoken": "^8.5.1",
+    "node-schedule": "^2.0.0",
+    "node-telegram-bot-api": "^0.52.0",
+    "qs": "^6.10.1",
+    "querystring": "^0.2.1",
+    "uuid": "^8.3.2",
+    "winston": "^3.3.3",
+    "winston-daily-rotate-file": "^4.5.2"
+  },
   "devDependencies": {
     "@babel/cli": "^7.13.14",
     "@babel/core": "^7.13.15",
     "@babel/node": "^7.13.13",
-    "@babel/preset-env": "^7.13.15"
-  },
-  "dependencies": {
-    "axios": "^0.21.1",
-    "dotenv": "^8.2.0",
-    "jsonwebtoken": "^8.5.1",
-    "qs": "^6.10.1",
-    "uuid": "^8.3.2"
+    "@babel/preset-env": "^7.13.15",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^7.24.0",
+    "eslint-config-prettier": "^8.2.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^3.3.1",
+    "prettier": "^2.2.1"
   }
 }

@@ -1,5 +1,8 @@
 import winston from 'winston';
 import winstonDaily from 'winston-daily-rotate-file';
+import path from 'path';
+import moment from 'moment';
+import readLastLines from 'read-last-lines';
 
 const logDir = 'logs'; // logs 디렉토리 하위에 로그 파일 저장
 const { combine, timestamp, printf } = winston.format;
@@ -54,4 +57,9 @@ if (process.env.NODE_ENV !== 'production') {
   );
 }
 
-export { logger };
+const tail = (lines = 10) => {
+  const filename = path.resolve(__dirname, `../../${logDir}`, `${moment().format('YYYY-MM-DD')}.log`);
+  return readLastLines.read(filename, lines);
+};
+
+export { logger, tail };

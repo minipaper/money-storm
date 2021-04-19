@@ -2,7 +2,7 @@ import schedule from 'node-schedule';
 import upbit from './services/upbit';
 import TelegramBot from 'node-telegram-bot-api';
 import { addComma } from './services/util';
-import { logger } from './config/winston';
+import { logger, tail } from './config/winston';
 
 let targetCoins = ['BTC', 'SNT', 'BTT', 'ETH', 'XRP', 'VET'];
 let targetPercent = 3;
@@ -23,9 +23,16 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
       "/start : bot 시작",
       "/push : 코인추가",
       "/pop : 코인제거",
+      "/log n: 로그 보기",
     ];
 
     bot.sendMessage(msg.chat.id, command.join('\n\n'));
+  });
+  bot.onText(/\/log (.+)/, (msg, match) => {
+    const lines = match[1] ? match[1] * 1 : targetCoins.length * 2;
+    tail(lines).then((data) => {
+      bot.sendMessage(msg.chat.id, `LOGS\n${data}`);
+    });
   });
   bot.onText(/\/stop/, (msg) => {
     isWork = false;

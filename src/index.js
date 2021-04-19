@@ -4,9 +4,9 @@ import TelegramBot from 'node-telegram-bot-api';
 import { addComma } from './services/util';
 import { logger } from './config/winston';
 
-let targetCoin = 'VET';
+let targetCoins = ['BTC', 'SNT', 'BTT', 'ETH', 'XRP', 'VET'];
+let targetPercent = 3;
 let account = {};
-let orderType = 'BUY';
 let isWork = true;
 
 let bot;
@@ -14,7 +14,16 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
   bot.onText(/\/\?|help|도움말|h/, (msg /*, match*/) => {
-    const command = ['/? : 도움말', '/info : 현재 자산정보', '/stop : bot 멈춤', '/start : bot 시작', '/target : 코인변경'];
+    // eslint-disable-next-line
+    const command = [
+      "/? : 도움말",
+      "/info : 현재 자산정보",
+      "/stop : bot 멈춤",
+      "/start : bot 시작",
+      "/push : 코인추가",
+      "/pop : 코인제거",
+    ];
+
     bot.sendMessage(msg.chat.id, command.join('\n\n'));
   });
   bot.onText(/\/stop/, (msg) => {
@@ -27,17 +36,35 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     logger.info('봇을 시작합니다.');
     bot.sendMessage(msg.chat.id, '봇을 시작합니다.');
   });
-  bot.onText(/\/i|\/info/, (msg) => {
-    bot.sendMessage(msg.chat.id, `자산정보\n${JSON.stringify(account, null, 2)}`);
-    bot.sendMessage(msg.chat.id, `목표코인\n${targetCoin}`);
-  });
-  bot.onText(/\/target (.+)/, (msg, match) => {
+  // 실시간 코인 추가
+  bot.onText(/\/push (.+)/, (msg, match) => {
     const coin = match[1] ? match[1].toUpperCase() : '';
-    if (coin !== '') {
-      targetCoin = coin;
-      bot.sendMessage(msg.chat.id, `${coin}으로 코인을 변경합니다.`);
+
+    // 중복 체크
+    if (targetCoins.indexOf(coin) < 0) {
+      targetCoins.push(coin);
     }
   });
+  // 실시간 코인 제거
+  bot.onText(/\/pop (.+)/, (msg, match) => {
+    const coin = match[1] ? match[1].toUpperCase() : '';
+    const index = targetCoins.indexOf(coin);
+
+    if (index > -1) {
+      targetCoins.splice(index, 1);
+    }
+  });
+  bot.onText(/\/i|\/info/, (msg) => {
+    bot.sendMessage(msg.chat.id, `자산정보\n${JSON.stringify(account, null, 2)}`);
+    bot.sendMessage(msg.chat.id, `지정코인\n${targetCoins.join(', ')}`);
+  });
+  // bot.onText(/\/target (.+)/, (msg, match) => {
+  //   const coin = match[1] ? match[1].toUpperCase() : '';
+  //   if (coin !== '') {
+  //     targetCoin = coin;
+  //     bot.sendMessage(msg.chat.id, `${coin}으로 코인을 변경합니다.`);
+  //   }
+  // });
 }
 
 const sayBot = (message) => {
@@ -48,62 +75,59 @@ const sayBot = (message) => {
 
 const main = async () => {
   if (!isWork) return;
-  // 매수시간인지 매도 시간인지 판단
-  const now = new Date().getMinutes();
-  orderType = now < 58 ? 'BUY' : 'SELL';
+  // 1. 내 자산 update
+  account = await upbit.updateAccount();
+  // console.info('account', account);
 
-  // 1. 계좌정보 업데이트
-  account = await upbit.updateAccount().catch((err) => {
-    logger.error(err);
-  });
-  logger.info(`account ${JSON.stringify(account[targetCoin] ? account[targetCoin] : account)}`);
-
-  if (orderType === 'BUY') {
-    // 매수해야하는 시간
-    if (account[targetCoin]) {
-      // 이미 구매함
-      logger.debug('이미 구매함' + JSON.stringify(account[targetCoin]));
-      return;
-    }
-
+  for (let i = 0; i < targetCoins.length; i++) {
+    const coinName = targetCoins[i];
+    const direction = account[coinName] ? 'SELL' : 'BUY';
+    logger.info(`${coinName} ${direction}`);
     // 2. 현재가 조회
-    let currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
-    logger.info('현재가' + JSON.stringify(currentCoinTick));
+    let currentCoinTick = await upbit.getTicker(`KRW-${coinName}`);
+    // console.info('현재가', coinName, currentCoinTick);
 
-    // 3. 변동성 돌파 전략 적용
-    // 최근 60분 시세 캔들 조회
-    let candles = await upbit.getCandlesMinutes(60, `KRW-${targetCoin}`, 2);
-    const current = candles[0];
-    const previous = candles[1]; // 이전
-    const range = previous.high_price - previous.low_price; // 변동폭 = (전일고가 - 전일저가)
-    const targetPrice = current.opening_price + range * 0.5;
+    if (direction === 'BUY') {
+      // 매수
+      let candles = await upbit.getCandlesMinutes(15, `KRW-${coinName}`, 2);
+      const current = candles[0];
+      const previous = candles[1]; // 이전
+      const range = previous.high_price - previous.low_price; // 변동폭 = (전일고가 - 전일저가)
+      const targetPrice = current.opening_price + range * 0.35;
 
-    logger.info(`현재가 ${addComma(currentCoinTick['trade_price'])}원 목표기준가 ${targetPrice}원 차이 ${addComma(targetPrice - currentCoinTick['trade_price'])}`);
+      logger.info(
+        `${coinName} - 현재가 ${addComma(currentCoinTick['trade_price'])}원 목표기준가 ${addComma(targetPrice)}원 차이 ${addComma(targetPrice - currentCoinTick['trade_price'])}`
+      );
 
-    if (currentCoinTick['trade_price'] > targetPrice) {
-      logger.info('사자');
-      const orderResponse = await upbit.order('BUY', account, currentCoinTick);
-      const { price, volume } = orderResponse;
-      logger.info(`매수 ${JSON.stringify(orderResponse)}`);
-      sayBot(`매수 ${addComma(price * volume)}원`);
+      if (currentCoinTick['trade_price'] > targetPrice) {
+        const cashKRW = Math.floor(account['KRW'].balance);
+        const buyCnt = targetCoins.filter((targetCoin) => !account[targetCoin]).length;
+        const orderMoney = Math.floor(cashKRW / buyCnt);
+        const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney);
+        const { price, volume } = orderResponse;
+        logger.info(`매수 ${JSON.stringify(orderResponse)}`);
+        sayBot(`매수 ${coinName} ${addComma(price * volume)}원`);
+      }
     } else {
-      logger.debug('가격이 맞지 않아 SKIP');
-      // sayBot(`매수 SKIP\n현재가 ${currentCoinTick['trade_price']}\n목표기준가 ${targetPrice}`);
-    }
-  } else if (orderType === 'SELL') {
-    // 매도해야하는 시간
-    if (account[targetCoin]) {
-      // 2. 현재가 조회
-      let currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
-      logger.info('현재가' + JSON.stringify(currentCoinTick));
-      const orderResponse = await upbit.order('SELL', account, currentCoinTick);
-      const { price, volume } = orderResponse;
-      logger.info(`매도 ${addComma(price * volume)}원`);
-      sayBot(`매도 ${addComma(price * volume)}원`);
+      // 매도
+      // 매수평균
+      const avgBuyPrice = account[coinName]['avg_buy_price'] * 1;
+      const nowPrice = currentCoinTick['trade_price'] * 1;
+      const targetPrice = Math.floor((avgBuyPrice * (100 + targetPercent)) / 100);
+      logger.info(`${coinName} - 매수평균 : ${avgBuyPrice}, 목표가: ${targetPrice}, 현재가 : ${nowPrice}`);
+
+      if (nowPrice > targetPrice) {
+        // 매도 실행
+        const orderResponse = await upbit.order('SELL', account, currentCoinTick);
+        const { price, volume } = orderResponse;
+        logger.info(`매도 ${addComma(price * volume)}원`);
+        sayBot(`매도 ${coinName} ${addComma(price * volume)}원`);
+      } else {
+        // 존버
+      }
     }
   }
 };
-
 /*
 *    *    *    *    *    *
 ┬    ┬    ┬    ┬    ┬    ┬
@@ -114,11 +138,10 @@ const main = async () => {
 │    │    └─────────────── hour (0 - 23)
 │    └──────────────────── minute (0 - 59)
 └───────────────────────── second (0 - 59, OPTIONAL)*/
-// 1분 주기
-logger.info(`APP START - 변동성 돌파 전략`);
-// main();
-schedule.scheduleJob('*/1 * * * *', (fireDate) => {
-  logger.info(`RUN ${fireDate}`);
+if (new Date().getSeconds() < 50) {
+  main();
+}
+schedule.scheduleJob('*/1 * * * *', () => {
   main().catch((err) => {
     logger.error(err);
     sayBot(`에러\n${JSON.stringify(err, null, 2)}`);

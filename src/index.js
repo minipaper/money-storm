@@ -82,7 +82,10 @@ const main = async () => {
 
     if (currentCoinTick['trade_price'] > targetPrice) {
       logger.info('사자');
-      const orderResponse = await upbit.order('BUY', account, currentCoinTick);
+      const orderResponse = await upbit.order('BUY', account, currentCoinTick).catch((err) => {
+        logger.error(`${err.response.data}`);
+        logger.error(`${JSON.stringify(err.response.data.error.message)}`);
+      });
       const { price, volume } = orderResponse;
       logger.info(`매수 ${JSON.stringify(orderResponse)}`);
       sayBot(`매수 ${addComma(price * volume)}원`);
@@ -116,7 +119,9 @@ const main = async () => {
 └───────────────────────── second (0 - 59, OPTIONAL)*/
 // 1분 주기
 logger.info(`APP START - 변동성 돌파 전략`);
-// main();
+if (new Date().getSeconds() < 50) {
+  main();
+}
 schedule.scheduleJob('*/1 * * * *', (fireDate) => {
   logger.info(`RUN ${fireDate}`);
   main().catch((err) => {

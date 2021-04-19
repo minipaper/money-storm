@@ -93,7 +93,7 @@ const order = (orderType, account, targetTick) => {
     // 매수
     params.side = 'bid';
     params.price = (currentPrice + roughTickPrice).toFixed(2);
-    const orderMoney = Math.floor(account['KRW'].balance);
+    const orderMoney = Math.floor(account['KRW'].balance * (1 - 0.0005));
     params.volume = (orderMoney / params.price).toFixed(8); // 주문량
   } else {
     // 매도

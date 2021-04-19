@@ -7,6 +7,7 @@ import { logger } from './config/winston';
 let targetCoins = ['BTC', 'SNT', 'BTT', 'ETH', 'XRP', 'VET'];
 let targetPercent = 3;
 let account = {};
+const buyCounter = {};
 let isWork = true;
 
 let bot;
@@ -105,9 +106,20 @@ const main = async () => {
         const cashKRW = Math.floor(account['KRW'].balance);
         if (cashKRW < 5000) {
           // 잔액부족
-          logger.error(`현금이 부족합니다. 현재 자금 ${cashKRW}원`);
+          logger.error(`현금이 부족합니다. 현재 자금 ${addComma(cashKRW, 0)}원`);
           return;
         }
+
+        if (!buyCounter[coinName]) {
+          buyCounter[coinName] = 0;
+        }
+        buyCounter[coinName] += 1;
+        if (buyCounter[coinName] < 3) {
+          // 3분동안 현재가격이 유지가 되면 구매 - 구매금액이 최소 3분이상 유지되야함
+          return;
+        }
+        buyCounter[coinName] = 0;
+
         const buyCnt = targetCoins.filter((targetCoin) => !account[targetCoin]).length;
         const orderMoney = Math.floor(cashKRW / buyCnt);
         const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney);
@@ -120,7 +132,7 @@ const main = async () => {
       // 매수평균
       const avgBuyPrice = account[coinName]['avg_buy_price'] * 1;
       const nowPrice = currentCoinTick['trade_price'] * 1;
-      const targetPrice = Math.floor((avgBuyPrice * (100 + targetPercent)) / 100);
+      const targetPrice = (avgBuyPrice * (100 + targetPercent)) / 100;
       logger.info(`${coinName} - 매수평균 : ${avgBuyPrice}, 목표가: ${targetPrice}, 현재가 : ${nowPrice}`);
 
       if (nowPrice > targetPrice) {

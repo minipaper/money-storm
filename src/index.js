@@ -44,6 +44,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     if (targetCoins.indexOf(coin) < 0) {
       targetCoins.push(coin);
     }
+    bot.sendMessage(msg.chat.id, `지정코인\n${targetCoins.join(', ')}`);
   });
   // 실시간 코인 제거
   bot.onText(/\/pop (.+)/, (msg, match) => {
@@ -53,6 +54,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     if (index > -1) {
       targetCoins.splice(index, 1);
     }
+    bot.sendMessage(msg.chat.id, `지정코인\n${targetCoins.join(', ')}`);
   });
   bot.onText(/\/i|\/info/, (msg) => {
     bot.sendMessage(msg.chat.id, `자산정보\n${JSON.stringify(account, null, 2)}`);
@@ -101,6 +103,11 @@ const main = async () => {
 
       if (currentCoinTick['trade_price'] > targetPrice) {
         const cashKRW = Math.floor(account['KRW'].balance);
+        if (cashKRW < 5000) {
+          // 잔액부족
+          logger.error(`현금이 부족합니다. 현재 자금 ${cashKRW}원`);
+          return;
+        }
         const buyCnt = targetCoins.filter((targetCoin) => !account[targetCoin]).length;
         const orderMoney = Math.floor(cashKRW / buyCnt);
         const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney);

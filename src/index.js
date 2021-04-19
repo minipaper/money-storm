@@ -58,17 +58,12 @@ const main = async () => {
   });
   logger.info(`account ${JSON.stringify(account[targetCoin] ? account[targetCoin] : account)}`);
 
+  // 2. 현재가 조회
+  let currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
+  logger.info('현재가' + JSON.stringify(currentCoinTick));
+
   if (orderType === 'BUY') {
     // 매수해야하는 시간
-    if (account[targetCoin]) {
-      // 이미 구매함
-      logger.debug('이미 구매함' + JSON.stringify(account[targetCoin]));
-      return;
-    }
-
-    // 2. 현재가 조회
-    let currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
-    logger.info('현재가' + JSON.stringify(currentCoinTick));
 
     // 3. 변동성 돌파 전략 적용
     // 최근 60분 시세 캔들 조회
@@ -79,6 +74,12 @@ const main = async () => {
     const targetPrice = current.opening_price + range * 0.5;
 
     logger.info(`현재가 ${addComma(currentCoinTick['trade_price'])}원 목표기준가 ${targetPrice}원 차이 ${addComma(targetPrice - currentCoinTick['trade_price'])}`);
+
+    if (account[targetCoin]) {
+      // 이미 구매함
+      logger.debug('이미 구매함' + JSON.stringify(account[targetCoin]));
+      return;
+    }
 
     if (currentCoinTick['trade_price'] > targetPrice) {
       logger.info('사자');
@@ -96,9 +97,6 @@ const main = async () => {
   } else if (orderType === 'SELL') {
     // 매도해야하는 시간
     if (account[targetCoin]) {
-      // 2. 현재가 조회
-      let currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
-      logger.info('현재가' + JSON.stringify(currentCoinTick));
       const orderResponse = await upbit.order('SELL', account, currentCoinTick);
       const { price, volume } = orderResponse;
       logger.info(`매도 ${addComma(price * volume)}원`);

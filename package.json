@@ -18,6 +18,7 @@
     "axios": "^0.21.1",
     "crypto": "^1.0.1",
     "dotenv": "^8.2.0",
+    "heikinashi": "^1.0.6",
     "jsonwebtoken": "^8.5.1",
     "node-schedule": "^2.0.0",
     "node-telegram-bot-api": "^0.52.0",

@@ -72,8 +72,9 @@ const ordersChance = (market) => {
  * @param orderType
  * @param account
  * @param targetTick
+ * @param orderMoney {number} 주문할 금액, 값이 없으면 현금보유 모두 구매
  */
-const order = (orderType, account, targetTick) => {
+const order = (orderType, account, targetTick, orderMoney = 0) => {
   const currentPrice = targetTick['trade_price'];
   // 시장가는 위험하니 1틱 차이로 매매
   const roughTickPrice =
@@ -93,8 +94,14 @@ const order = (orderType, account, targetTick) => {
     // 매수
     params.side = 'bid';
     params.price = (currentPrice + roughTickPrice).toFixed(2);
-    const orderMoney = Math.floor(account['KRW'].balance * (1 - 0.0005));
-    params.volume = (orderMoney / params.price).toFixed(8); // 주문량
+    let balance = Math.floor(account['KRW'].balance);
+    if (orderMoney !== 0) {
+      balance = orderMoney;
+    }
+    // 수수료
+    balance = Math.floor(balance * (1 - 0.0005));
+    // const orderMoney = Math.floor(account['KRW'].balance);
+    params.volume = (balance / params.price).toFixed(8); // 주문량
   } else {
     // 매도
     params.side = 'ask';

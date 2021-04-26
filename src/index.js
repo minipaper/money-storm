@@ -4,11 +4,12 @@ import TelegramBot from 'node-telegram-bot-api';
 import { addComma } from './services/util';
 import { logger, tail } from './config/winston';
 
-let targetCoins = ['BTC', 'SNT', 'BTT', 'ETH', 'XRP', 'VET'];
+let targetCoins = ['BTC', 'BTT', 'ETH', 'XRP'];
 let targetPercent = 3;
 let account = {};
 const buyCounter = {};
 let isWork = true;
+let buy = false;
 
 let bot;
 if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKEN) {
@@ -18,21 +19,27 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     // eslint-disable-next-line
     const command = [
       "/? : 도움말",
-      "/info : 현재 자산정보",
-      "/stop : bot 멈춤",
-      "/start : bot 시작",
-      "/push : 코인추가",
-      "/pop : 코인제거",
-      "/log n: 로그 보기",
+      "자산정보 /info",
+      "bot멈춤 /stop",
+      "bot시작 /start",
+      "코인추가 /push",
+      "코인제거 /pop",
+      "자동구매 /buy",
+      "로그보기 /log",
     ];
 
     bot.sendMessage(msg.chat.id, command.join('\n\n'));
   });
-  bot.onText(/\/log (.+)/, (msg, match) => {
+  bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {
     const lines = match[1] ? match[1] * 1 : targetCoins.length * 2;
     tail(lines).then((data) => {
       bot.sendMessage(msg.chat.id, `LOGS\n${data}`);
     });
+  });
+  bot.onText(/\/buy/, (msg) => {
+    buy = !buy;
+    logger.info(`자동구매 : ${buy ? 'ON' : 'OFF'}`);
+    bot.sendMessage(msg.chat.id, `자동구매 : ${buy ? 'ON' : 'OFF'}`);
   });
   bot.onText(/\/stop/, (msg) => {
     isWork = false;
@@ -65,16 +72,10 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     bot.sendMessage(msg.chat.id, `지정코인\n${targetCoins.join(', ')}`);
   });
   bot.onText(/\/i|\/info/, (msg) => {
-    bot.sendMessage(msg.chat.id, `자산정보\n${JSON.stringify(account, null, 2)}`);
+    // bot.sendMessage(msg.chat.id, `자산정보\n${JSON.stringify(account, null, 2)}`);
+    bot.sendMessage(msg.chat.id, `봇 동작 ${isWork ? 'True' : 'False'}`);
     bot.sendMessage(msg.chat.id, `지정코인\n${targetCoins.join(', ')}`);
   });
-  // bot.onText(/\/target (.+)/, (msg, match) => {
-  //   const coin = match[1] ? match[1].toUpperCase() : '';
-  //   if (coin !== '') {
-  //     targetCoin = coin;
-  //     bot.sendMessage(msg.chat.id, `${coin}으로 코인을 변경합니다.`);
-  //   }
-  // });
 }
 
 const sayBot = (message) => {
@@ -129,10 +130,14 @@ const main = async () => {
 
         const buyCnt = targetCoins.filter((targetCoin) => !account[targetCoin]).length;
         const orderMoney = Math.floor(cashKRW / buyCnt);
-        const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney);
-        const { price, volume } = orderResponse;
-        logger.info(`매수 ${JSON.stringify(orderResponse)}`);
-        sayBot(`매수 ${coinName} ${addComma(price * volume)}원`);
+        if (buy) {
+          const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney);
+          const { price, volume } = orderResponse;
+          logger.info(`매수 ${JSON.stringify(orderResponse)}`);
+          sayBot(`매수 ${coinName} ${addComma(price * volume)}원`);
+        } else {
+          sayBot(`매수하세요!\n${coinName} - 현재가 ${addComma(currentCoinTick['trade_price'])}원 목표기준가 ${addComma(targetPrice)}원 차이 ${addComma(orderMoney)}`);
+        }
       }
     } else {
       // 매도

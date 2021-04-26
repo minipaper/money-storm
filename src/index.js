@@ -5,7 +5,12 @@ import HeikinAshi from 'heikinashi';
 import { addComma } from './services/util';
 import { logger } from './config/winston';
 
-const coins = ['MFT', 'MED'];
+const coins = ['MFT', 'MED', 'ETH'];
+const orderMoney = {
+  MFT: 100000,
+  MED: 100000,
+  ETH: 100000,
+};
 
 let bot;
 if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKEN) {
@@ -72,16 +77,16 @@ const main = async () => {
     if (result[0] === 'DOWN' && result[1] === 'UP' && result[2] === 'UP' && isBuy) {
       // 매수
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-      const orderResponse = upbit.order('BUY', account, currentCoinTick, 100000);
+      const orderResponse = upbit.order('BUY', account, currentCoinTick, orderMoney[coin]);
       const { price, volume } = orderResponse;
-      logger.info(`매수 ${JSON.stringify(orderResponse)}`);
+      logger.info(`매수 ${coin} ${JSON.stringify(orderResponse)}`);
       sayBot(`매수 ${coin} ${addComma(price * volume)}원`);
     } else if (result[0] === 'UP' && result[1] === 'DOWN' && result[2] === 'DOWN' && isSell) {
       // 매도
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
       const orderResponse = upbit.order('SELL', account, currentCoinTick);
       const { price, volume } = orderResponse;
-      logger.info(`매도 ${addComma(price * volume)}원`);
+      logger.info(`매도 ${coin} ${addComma(price * volume)}원`);
       sayBot(`매도 ${coin} ${addComma(price * volume)}원`);
     } else {
       logger.info(`SKIP ${coin} = ${JSON.stringify(result)}`);

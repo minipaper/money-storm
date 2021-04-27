@@ -3,14 +3,15 @@ import TelegramBot from 'node-telegram-bot-api';
 import upbit from './services/upbit';
 import HeikinAshi from 'heikinashi';
 import { addComma } from './services/util';
-import { logger } from './config/winston';
+import { logger, tail } from './config/winston';
 
-const coins = ['XRP', 'MFT', 'MED', 'ETH'];
+const coins = ['XRP', 'BTT', 'MFT', 'MED', 'ETH'];
 const orderMoney = {
-  XRP: 1500000,
+  XRP: 1000000,
+  BTT: 1000000,
   MFT: 130000,
   MED: 130000,
-  ETH: 130000,
+  ETH: 500000,
 };
 
 let bot;
@@ -18,8 +19,15 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
   bot.onText(/\/\?|help|도움말|h/, (msg /*, match*/) => {
-    const command = ['/? : 도움말', '/info : 현재 자산정보', '/stop : bot 멈춤', '/start : bot 시작', '/target : 코인변경'];
+    const command = ['도움말 : /help', '로그 : /log'];
     bot.sendMessage(msg.chat.id, command.join('\n\n'));
+  });
+  // log
+  bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {
+    const lines = match[1] ? match[1] * 1 : (coins.length + 1) * 2;
+    tail(lines).then((data) => {
+      bot.sendMessage(msg.chat.id, `LOGS\n${data}`);
+    });
   });
 }
 

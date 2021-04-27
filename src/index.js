@@ -5,8 +5,9 @@ import HeikinAshi from 'heikinashi';
 import { addComma } from './services/util';
 import { logger } from './config/winston';
 
-const coins = ['MFT', 'MED', 'ETH'];
+const coins = ['XRP', 'MFT', 'MED', 'ETH'];
 const orderMoney = {
+  XRP: 1500000,
   MFT: 130000,
   MED: 130000,
   ETH: 130000,

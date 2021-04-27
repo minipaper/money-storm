@@ -5,23 +5,29 @@ import HeikinAshi from 'heikinashi';
 import { addComma } from './services/util';
 import { logger, tail } from './config/winston';
 
-const coins = ['XRP', 'BTT', 'MFT', 'MED', 'ETH', 'QTUM'];
-const orderMoney = {
-  XRP: 1000000,
+const orderTable = {
   BTT: 1000000,
-  ETH: 500000,
-  MFT: 200000,
+  XRP: 7500000,
+  ETH: 750000,
   MED: 200000,
-  QTUM: 100000,
+  MFT: 150000,
+  SNT: 150000,
 };
+const coins = Object.keys(orderTable);
+
+let account = {};
 
 let bot;
 if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKEN) {
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
   bot.onText(/\/\?|help|도움말|h/, () => {
-    const command = ['도움말 : /help', '로그 : /log'];
+    const command = ['도움말 : /help', 'Account : /info', '로그 : /log'];
     sayBot(command.join('\n\n'));
+  });
+  // info
+  bot.onText(/\/info/, () => {
+    sayBot(`INFO\n${account}`);
   });
   // log
   bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {
@@ -39,7 +45,7 @@ const sayBot = (message) => {
     });
   }
 };
-let account = {};
+
 const main = async () => {
   // 로직 시작
   account = await upbit.updateAccount();
@@ -88,7 +94,7 @@ const main = async () => {
     if (result[0] === 'DOWN' && result[1] === 'UP' && result[2] === 'UP' && isBuy) {
       // 매수
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-      const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney[coin]);
+      const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderTable[coin]);
       const { price, volume } = orderResponse;
       logger.info(`매수 ${coin} ${JSON.stringify(orderResponse)}`);
       sayBot(`매수 ${coin} ${addComma(price * volume)}원`);

@@ -5,35 +5,38 @@ import HeikinAshi from 'heikinashi';
 import { addComma } from './services/util';
 import { logger, tail } from './config/winston';
 
-const coins = ['XRP', 'BTT', 'MFT', 'MED', 'ETH'];
+const coins = ['XRP', 'BTT', 'MFT', 'MED', 'ETH', 'QTUM'];
 const orderMoney = {
   XRP: 1000000,
   BTT: 1000000,
-  MFT: 130000,
-  MED: 130000,
   ETH: 500000,
+  MFT: 200000,
+  MED: 200000,
+  QTUM: 100000,
 };
 
 let bot;
 if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKEN) {
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
-  bot.onText(/\/\?|help|도움말|h/, (msg /*, match*/) => {
+  bot.onText(/\/\?|help|도움말|h/, () => {
     const command = ['도움말 : /help', '로그 : /log'];
-    bot.sendMessage(msg.chat.id, command.join('\n\n'));
+    sayBot(command.join('\n\n'));
   });
   // log
   bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {
     const lines = match[1] ? match[1] * 1 : (coins.length + 1) * 2;
     tail(lines).then((data) => {
-      bot.sendMessage(msg.chat.id, `LOGS\n${data}`);
+      sayBot(`LOGS\n${data}`);
     });
   });
 }
 
 const sayBot = (message) => {
   if (bot) {
-    bot.sendMessage(process.env.TELEGRAM_BOT_CHAT_ID, message);
+    bot.sendMessage(process.env.TELEGRAM_BOT_CHAT_ID, message).catch((err) => {
+      logger.error(`${JSON.stringify(err)}`);
+    });
   }
 };
 let account = {};
@@ -51,7 +54,8 @@ const main = async () => {
     const items = HeikinAshi(
       candles.reverse().map((bar) => {
         const { trade_price, opening_price, high_price, low_price, timestamp, candle_acc_trade_volume, candle_date_time_kst } = bar;
-        const item = {
+
+        return {
           time: timestamp,
           close: trade_price,
           high: high_price,
@@ -60,8 +64,6 @@ const main = async () => {
           volume: candle_acc_trade_volume,
           kst_time: candle_date_time_kst,
         };
-
-        return item;
       }),
       {
         overWrite: false, //overwrites the original data or create a new array

@@ -7,9 +7,9 @@ import { logger } from './config/winston';
 
 const coins = ['MFT', 'MED', 'ETH'];
 const orderMoney = {
-  MFT: 100000,
-  MED: 100000,
-  ETH: 100000,
+  MFT: 130000,
+  MED: 130000,
+  ETH: 130000,
 };
 
 let bot;
@@ -77,14 +77,14 @@ const main = async () => {
     if (result[0] === 'DOWN' && result[1] === 'UP' && result[2] === 'UP' && isBuy) {
       // 매수
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-      const orderResponse = upbit.order('BUY', account, currentCoinTick, orderMoney[coin]);
+      const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderMoney[coin]);
       const { price, volume } = orderResponse;
       logger.info(`매수 ${coin} ${JSON.stringify(orderResponse)}`);
       sayBot(`매수 ${coin} ${addComma(price * volume)}원`);
     } else if (result[0] === 'UP' && result[1] === 'DOWN' && result[2] === 'DOWN' && isSell) {
       // 매도
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-      const orderResponse = upbit.order('SELL', account, currentCoinTick);
+      const orderResponse = await upbit.order('SELL', account, currentCoinTick);
       const { price, volume } = orderResponse;
       logger.info(`매도 ${coin} ${addComma(price * volume)}원`);
       sayBot(`매도 ${coin} ${addComma(price * volume)}원`);
@@ -107,8 +107,8 @@ const main = async () => {
 │    │    └─────────────── hour (0 - 23)
 │    └──────────────────── minute (0 - 59)
 └───────────────────────── second (0 - 59, OPTIONAL)*/
-// 정시 4분마다 체크
-schedule.scheduleJob('4 * * * *', (fireDate) => {
+// 정시 1분마다 체크
+schedule.scheduleJob('1 * * * *', (fireDate) => {
   logger.info(`RUN ${fireDate}`);
   main().catch((err) => {
     logger.error(err);

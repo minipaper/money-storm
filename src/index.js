@@ -8,7 +8,7 @@ import { logger, tail } from './config/winston';
 const orderTable = {
   BTT: 1000000,
   XRP: 7500000,
-  ETH: 750000,
+  ETH: 7500000,
   MED: 200000,
   MFT: 150000,
   SNT: 150000,

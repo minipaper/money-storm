@@ -27,7 +27,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
   });
   // info
   bot.onText(/\/info/, () => {
-    sayBot(`INFO\n${account}`);
+    sayBot(`INFO\n${JSON.stringify(account, null, 2)}`);
   });
   // log
   bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {

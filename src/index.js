@@ -6,10 +6,10 @@ import { addComma } from './services/util';
 import { logger, tail } from './config/winston';
 
 const orderTable = {
-  BTT: 1000000,
+  BTT: 900000,
+  ETH: 900000,
   BTC: 700000,
-  XRP: 400000,
-  ETH: 700000,
+  XRP: 300000,
   MED: 300000,
   SNT: 300000,
   CHZ: 300000,
@@ -136,8 +136,8 @@ const main = async () => {
 │    │    └─────────────── hour (0 - 23)
 │    └──────────────────── minute (0 - 59)
 └───────────────────────── second (0 - 59, OPTIONAL)*/
-// 정시 1분마다 체크
-schedule.scheduleJob('1 * * * *', (fireDate) => {
+// 10분마다 체크
+schedule.scheduleJob('30 */10 * * * *', (fireDate) => {
   logger.info(`RUN ${fireDate}`);
   main().catch((err) => {
     logger.error(err);

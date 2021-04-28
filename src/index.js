@@ -89,19 +89,30 @@ const main = async () => {
       return item;
     });
     items.splice(0, items.length - 3);
+    items.pop(); // 마지막 틱은 완성이 아니기 때문에 제거
+    const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
 
     const result = items.map((item) => item.change);
 
-    if (result[0] === 'DOWN' && result[1] === 'UP' && result[2] === 'UP' && isBuy) {
+    const previousTick = items[1]; // 하이킨 아시 - 이전틱
+    const currentOpen = (previousTick.open + previousTick.close) / 2; // 하이킨 아시 - 현재 시작가
+    // 시작가보다 현재 거래가가 높아졌으면 UP
+    if (currentOpen < currentCoinTick['trade_price']) {
+      result.push('UP');
+    } else if (currentOpen > currentCoinTick['trade_price']) {
+      result.push('DOWN');
+    } else {
+      result.push('SAME');
+    }
+
+    if ((isBuy && result[0] === 'DOWN' && result[1] === 'UP' && result[2] === 'UP') || (isBuy && result[0] === 'UP' && result[1] === 'UP' && result[2] === 'UP')) {
       // 매수
-      const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
       const orderResponse = await upbit.order('BUY', account, currentCoinTick, orderTable[coin]);
       const { price, volume } = orderResponse;
       logger.info(`매수 ${coin} ${JSON.stringify(orderResponse)}`);
       sayBot(`매수 ${coin} ${addComma(price * volume)}원`);
-    } else if (result[0] === 'UP' && result[1] === 'DOWN' && result[2] === 'DOWN' && isSell) {
+    } else if ((isSell && result[0] === 'UP' && result[1] === 'DOWN' && result[1] === 'DOWN') || (isSell && result[0] === 'DOWN' && result[1] === 'DOWN' && result[1] === 'DOWN')) {
       // 매도
-      const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
       const orderResponse = await upbit.order('SELL', account, currentCoinTick);
       const { price, volume } = orderResponse;
       logger.info(`매도 ${coin} ${addComma(price * volume)}원`);

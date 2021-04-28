@@ -8,11 +8,11 @@ import { logger, tail } from './config/winston';
 const orderTable = {
   BTT: 1000000,
   BTC: 700000,
-  XRP: 700000,
+  XRP: 400000,
   ETH: 700000,
-  MED: 200000,
-  SNT: 200000,
-  CHZ: 200000,
+  MED: 300000,
+  SNT: 300000,
+  CHZ: 300000,
 };
 const coins = Object.keys(orderTable);
 

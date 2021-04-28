@@ -1,5 +1,6 @@
 import http from '../config/http';
 import { logger } from '../config/winston';
+import HeikinAshi from 'heikinashi';
 
 // 금액에 따른 틱당 금액
 const tickInfo = [
@@ -43,6 +44,45 @@ const getCandlesMinutes = (unit = 5, market, count) => {
     count,
   };
   return http.get(`/v1/candles/minutes/${unit}`, { params }).then(({ data }) => data);
+};
+
+const getHeikinAshi = (unit, market, cnt) => {
+  return new Promise((resolve) => {
+    getCandlesMinutes(unit, market, 200).then((candles) => {
+      const items = HeikinAshi(
+        candles.reverse().map((bar) => {
+          const { trade_price, opening_price, high_price, low_price, timestamp, candle_acc_trade_volume, candle_date_time_kst } = bar;
+
+          return {
+            time: timestamp,
+            close: trade_price,
+            high: high_price,
+            low: low_price,
+            open: opening_price,
+            volume: candle_acc_trade_volume,
+            kst_time: candle_date_time_kst,
+          };
+        }),
+        {
+          overWrite: false, //overwrites the original data or create a new array
+          formatNumbers: false, //formats the numbers and reduces their significant digits based on the values
+          decimals: 4, //number of significant digits
+          forceExactDecimals: false, //force the number of significant digits or reduce them if the number is high
+        }
+      ).map((item) => {
+        if (item.close > item.open) {
+          item.change = 'UP';
+        } else if (item.close < item.open) {
+          item.change = 'DOWN';
+        } else {
+          item.change = 'SAME';
+        }
+        return item;
+      });
+      items.splice(0, items.length - cnt);
+      resolve(items.map((item) => item.change));
+    });
+  });
 };
 
 /**
@@ -118,6 +158,7 @@ const order = (orderType, account, targetTick, orderMoney = 0) => {
 export default {
   updateAccount,
   getCandlesMinutes,
+  getHeikinAshi,
   getTicker,
   getTickers,
   ordersChance,

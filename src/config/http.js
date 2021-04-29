@@ -18,7 +18,7 @@ const authorizationToken = `Bearer ${token}`;
 
 const instance = axios.create({
   baseURL: serverUrl,
-  timeout: 1000,
+  timeout: 2000,
   headers: { Authorization: authorizationToken },
   paramsSerializer: (params) => Qs.stringify(params, { arrayFormat: 'brackets' }),
 });

@@ -1,6 +1,7 @@
 import http from '../config/http';
 import { logger } from '../config/winston';
 import HeikinAshi from 'heikinashi';
+import util from './util';
 
 // 금액에 따른 틱당 금액
 const tickInfo = [
@@ -30,6 +31,43 @@ const updateAccount = () => {
       })
       .catch((err) => reject(err));
   });
+};
+
+/**
+ 업비트에서 거래 가능한 마켓 목록(원화마켓만)
+ */
+const getMarkets = () => {
+  return new Promise((resolve) => {
+    http.get(`/v1/market/all?isDetails=true`).then(({ data }) => {
+      const markets = data.filter((m) => m.market.includes('KRW-') && m.market_warning === 'NONE');
+      resolve(markets);
+    });
+  });
+};
+
+const recommendCoins = async (cnt = 1, checkSecondCandle = true) => {
+  const markets = await getMarkets();
+  const result = [];
+  for (let i = 0; i < markets.length; i++) {
+    if (result.length >= cnt) {
+      break;
+    }
+    const m = markets[i];
+    const hours = await getHeikinAshi(60, m.market, 3);
+    if (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP') {
+      if (!checkSecondCandle) {
+        result.push(m);
+        continue;
+      }
+      const thirty = await getHeikinAshi(15, m.market, 3);
+      if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
+        result.push(m);
+      }
+    }
+    await util.delay(100); // upbit request timeout
+  }
+
+  return result;
 };
 
 /**
@@ -157,6 +195,8 @@ const order = (orderType, account, targetTick, orderMoney = 0) => {
 
 export default {
   updateAccount,
+  getMarkets,
+  recommendCoins,
   getCandlesMinutes,
   getHeikinAshi,
   getTicker,

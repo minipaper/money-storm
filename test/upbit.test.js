@@ -60,7 +60,7 @@ describe('UPBIT', () => {
     console.log(`추천 코인 ${result.map((m) => m.korean_name).join(', ')}`);
   }).timeout(120 * 1000);
 
-  it.skip('현재 수익률', async () => {
+  it('현재 수익금', async () => {
     const account = await upbit.updateAccount();
     const coins = Object.keys(account).filter((c) => c !== 'KRW');
     if (coins.length === 0) {
@@ -76,14 +76,28 @@ describe('UPBIT', () => {
       const ticker = snapshot.find((m) => m.market === `KRW-${coin}`);
 
       const result = balance * ticker.trade_price - balance * avg_buy_price;
-      console.log(`수익률 ${coin} : ${result}`);
+      console.log(`수익금 ${coin} : ${result}`);
       sum += result;
     }
-    console.log(`총 수익률 ${util.addComma(sum)}원`);
+    console.log(`총 수익금 ${util.addComma(sum)}원`);
   });
 
-  it('추천코인찾기', async () => {
-    const market = await upbit.recommendCoins(3);
-    console.log(market.map((m) => m.korean_name).join(', '));
+  it.skip('추천코인찾기', async () => {
+    const exceptCoin = []; //['QTUM', 'BTT'];
+    const market = await upbit.recommendCoins(10, exceptCoin, true);
+    if (market.length === 0) {
+      console.log('추천할 코인이 없습니다.');
+    }
+    console.log(market.map((m) => `${m.korean_name}(${m.market})`).join(', '));
   }).timeout(120 * 1000);
+
+  it.skip('거래량 100만이상 코인', async () => {
+    const market = await upbit.getTickers(['KRW-MFT']);
+    console.log(market);
+  });
+
+  it.skip('채결강도', async () => {
+    // const market = await upbit.getTickers(['KRW-MANA']);
+    // console.log(market);
+  });
 });

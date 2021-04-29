@@ -44,10 +44,26 @@ const getMarkets = () => {
     });
   });
 };
+/**
+ * 추천 코인목록
+ * @param cnt 추천 최대 개수
+ * @param exceptCoin 예외코인 ['BTC', 'ABC']
+ * @param checkSecondCandle 두번째 봉까지 확인
+ */
+const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true) => {
+  // 거래하고 있는 모든 코인 조회
+  let markets = await getMarkets();
 
-const recommendCoins = async (cnt = 1, checkSecondCandle = true) => {
-  const markets = await getMarkets();
-  const result = [];
+  // 예외하고 싶은 코인
+  if (exceptCoin.length > 0) {
+    markets = markets.filter((m) => {
+      if (exceptCoin.includes(m.market.replace('KRW-', ''))) {
+        return false;
+      }
+      return true;
+    });
+  }
+  let result = [];
   for (let i = 0; i < markets.length; i++) {
     if (result.length >= cnt) {
       break;
@@ -56,16 +72,23 @@ const recommendCoins = async (cnt = 1, checkSecondCandle = true) => {
     const hours = await getHeikinAshi(60, m.market, 3);
     if (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP') {
       if (!checkSecondCandle) {
+        m.ticker = await getTicker(m.market);
         result.push(m);
         continue;
       }
       const thirty = await getHeikinAshi(15, m.market, 3);
       if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
+        m.ticker = await getTicker(m.market);
         result.push(m);
       }
     }
     await util.delay(100); // upbit request timeout
   }
+
+  // order by 거래량 높은순
+  result.sort((m1, m2) => {
+    return m2.ticker.acc_trade_price_24h - m1.ticker.acc_trade_price_24h;
+  });
 
   return result;
 };

@@ -34,15 +34,21 @@ const updateAccount = () => {
 };
 
 /**
- 업비트에서 거래 가능한 마켓 목록(원화마켓만)
+ 업비트에서 거래 가능한 마켓 목록(원화마켓만) (거래량순)
  */
-const getMarkets = () => {
-  return new Promise((resolve) => {
-    http.get(`/v1/market/all?isDetails=true`).then(({ data }) => {
-      const markets = data.filter((m) => m.market.includes('KRW-') && m.market_warning === 'NONE');
-      resolve(markets);
-    });
+const getMarkets = async () => {
+  const { data } = await http.get(`/v1/market/all?isDetails=true`);
+  const markets = data.filter((m) => m.market.includes('KRW-') && m['market_warning'] === 'NONE');
+  await util.delay(200);
+  const tickers = await getTickers(markets.map((m) => m.market));
+  tickers.sort((m1, m2) => {
+    return m2.acc_trade_price_24h - m1.acc_trade_price_24h;
   });
+  const orderedMarket = tickers.map((t) => t.market);
+  markets.sort((m1, m2) => {
+    return orderedMarket.indexOf(m1.market) - orderedMarket.indexOf(m2.market);
+  });
+  return markets;
 };
 /**
  * 추천 코인목록
@@ -65,15 +71,15 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
   }
   let result = [];
   for (let i = 0; i < markets.length; i++) {
-    // 1.5배수까지 추천항목받음
-    if (result.length >= cnt * 1.5) {
+    if (result.length >= cnt) {
       break;
     }
     const m = markets[i];
-    const hours = await getHeikinAshi(60, m.market, 3);
-    if (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP') {
+    const hours = await getHeikinAshi(60, m.market, 4);
+    if ((hours[1] === 'DOWN' && hours[2] === 'UP' && hours[3] === 'UP') || (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP' && hours[3] === 'UP')) {
       if (!checkSecondCandle) {
         m.ticker = await getTicker(m.market);
+        await util.delay(100);
         result.push(m);
         continue;
       }
@@ -84,6 +90,7 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
       // }
 
       const minute = await getHeikinAshi(1, m.market, 2);
+      await util.delay(100);
       if (minute[0] === 'UP' && minute[1] === 'UP') {
         m.ticker = await getTicker(m.market);
         result.push(m);

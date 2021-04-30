@@ -176,6 +176,10 @@ const main = async () => {
           const idx = exceptionCoins.indexOf(coin);
           exceptionCoins.splice(idx, 1);
         }, minutes);
+        if (targetCoins.includes(coin)) {
+          const idx = targetCoins.indexOf(coin);
+          targetCoins.splice(idx, 1);
+        }
         logger.info(msg);
         sayBot(msg);
         await delay(300);

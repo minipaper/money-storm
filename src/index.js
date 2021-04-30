@@ -198,4 +198,3 @@ schedule.scheduleJob('10 * * * * *', (fireDate) => {
     sayBot(`에러\n${JSON.stringify(err, null, 2)}`);
   });
 });
-main();

@@ -93,7 +93,7 @@ const main = async () => {
     // 추천 코인 추가
     console.info('추천코인추가');
     const exception = [...coins, ...exceptionCoins]; // 기존 가지고있는 코인
-    let recommend = await upbit.recommendCoins(coinCnt - coins.length, exception, false);
+    let recommend = await upbit.recommendCoins(coinCnt - coins.length, exception, true);
     recommend = recommend.map((c) => c.market.replace('KRW-', ''));
     console.info(`${JSON.stringify(recommend)}`);
     targetCoins = [...targetCoins, ...recommend];

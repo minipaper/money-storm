@@ -76,8 +76,14 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
         result.push(m);
         continue;
       }
-      const thirty = await getHeikinAshi(15, m.market, 3);
-      if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
+      // const thirty = await getHeikinAshi(15, m.market, 3);
+      // if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
+      //   m.ticker = await getTicker(m.market);
+      //   result.push(m);
+      // }
+
+      const minute = await getHeikinAshi(1, m.market, 2);
+      if (minute[0] === 'UP' && minute[1] === 'UP') {
         m.ticker = await getTicker(m.market);
         result.push(m);
       }

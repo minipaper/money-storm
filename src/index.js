@@ -5,10 +5,10 @@ import util, { addComma, delay } from './services/util';
 import { logger, tail } from './config/winston';
 
 let coinCnt = 5;
-const targetRate = 1; // 수익률 1퍼센트 이상이면 일괄 매도
+const targetRate = 0.8; // 수익률 1퍼센트 이상이면 일괄 매도
 
 const exceptionCoins = []; // 제외하고 싶은 코인
-const pricePerCoin = 100000; // 코인한종목당 가격
+const pricePerCoin = 200000; // 코인한종목당 가격
 
 let targetCoins = [];
 let account = {};
@@ -28,6 +28,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
       account,
       targetCoins,
       isWorking,
+      exceptionCoins,
     };
     sayBot(`INFO\n${JSON.stringify(info, null, 2)}`);
   });
@@ -133,7 +134,7 @@ const main = async () => {
   }
 
   // 전체 수익률이 1퍼센트 이상이면
-  if (rate > targetRate) {
+  if (rate >= targetRate) {
     // 일괄매도
     await sellAll(coins);
   } else {
@@ -164,6 +165,13 @@ const main = async () => {
         const orderResponse = await upbit.order('SELL', account, currentCoinTick);
         const { price, volume } = orderResponse;
         const msg = `[급락] - 매도 ${coin} ${addComma(price * volume)}원`;
+        // 급락 코인 당분간 BAN
+        exceptionCoins.push(coin);
+        const minutes = 70 * 60 * 1000; // 70분 뒤까지 ban
+        setTimeout(() => {
+          const idx = exceptionCoins.indexOf(coin);
+          exceptionCoins.splice(idx, 1);
+        }, minutes);
         logger.info(msg);
         sayBot(msg);
         await delay(300);

@@ -97,6 +97,8 @@ const main = async () => {
     recommend = recommend.map((c) => c.market.replace('KRW-', ''));
     console.info(`${JSON.stringify(recommend)}`);
     targetCoins = [...targetCoins, ...recommend];
+    const uniqArr = new Set(targetCoins);
+    targetCoins = [...uniqArr];
     if (targetCoins.length > coinCnt) {
       targetCoins.length = coinCnt;
     }
@@ -142,8 +144,10 @@ const main = async () => {
     console.log('일괄매도 조건 안됨');
     for (let i = 0; i < targetCoins.length; i++) {
       const targetCoin = targetCoins[i];
-      // 추천종목중 없는 코인 구매
-      if (!account[targetCoin]) {
+      if (account[targetCoin]) {
+        // 코인이 있으면 skip
+      } else {
+        // 추천종목중 없는 코인 구매
         console.log(`코인 매수 진행 : ${targetCoin}`);
         const currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
         const orderResponse = await upbit.order('BUY', account, currentCoinTick, pricePerCoin);

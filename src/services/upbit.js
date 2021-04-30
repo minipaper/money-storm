@@ -65,7 +65,8 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
   }
   let result = [];
   for (let i = 0; i < markets.length; i++) {
-    if (result.length >= cnt) {
+    // 1.5배수까지 추천항목받음
+    if (result.length >= cnt * 1.5) {
       break;
     }
     const m = markets[i];
@@ -95,6 +96,10 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
   result.sort((m1, m2) => {
     return m2.ticker.acc_trade_price_24h - m1.ticker.acc_trade_price_24h;
   });
+
+  if (result.length > cnt) {
+    result.length = cnt;
+  }
 
   return result;
 };

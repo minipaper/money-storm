@@ -4,11 +4,11 @@ import upbit from './services/upbit';
 import util, { addComma, delay } from './services/util';
 import { logger, tail } from './config/winston';
 
-let coinCnt = 5;
-const targetRate = 0.8; // 수익률 1퍼센트 이상이면 일괄 매도
+let coinCnt = 4;
+const targetRate = 0.77; // 수익률 1퍼센트 이상이면 일괄 매도
 
 const exceptionCoins = []; // 제외하고 싶은 코인
-const pricePerCoin = 200000; // 코인한종목당 가격
+const pricePerCoin = 300000; // 코인한종목당 가격
 
 let targetCoins = [];
 let account = {};
@@ -95,7 +95,7 @@ const main = async () => {
     const exception = [...coins, ...exceptionCoins]; // 기존 가지고있는 코인
     let recommend = await upbit.recommendCoins(coinCnt - coins.length, exception, true);
     recommend = recommend.map((c) => c.market.replace('KRW-', ''));
-    console.info(`${JSON.stringify(recommend)}`);
+    logger.info(`추천코인 ${JSON.stringify(recommend)}`);
     targetCoins = [...targetCoins, ...recommend];
     const uniqArr = new Set(targetCoins);
     targetCoins = [...uniqArr];
@@ -195,7 +195,7 @@ const main = async () => {
 │    └──────────────────── minute (0 - 59)
 └───────────────────────── second (0 - 59, OPTIONAL)*/
 // 1분마다 체크
-schedule.scheduleJob('10 * * * * *', (fireDate) => {
+schedule.scheduleJob('20 * * * * *', (fireDate) => {
   logger.info(`RUN ${fireDate}`);
   main().catch((err) => {
     logger.error(err);

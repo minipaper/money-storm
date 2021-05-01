@@ -4,11 +4,12 @@ import upbit from './services/upbit';
 import util, { addComma, delay } from './services/util';
 import { logger, tail } from './config/winston';
 
-let coinCnt = 3;
+const priceTotal = 1000000;
+let coinCnt = 4;
+const pricePerCoin = priceTotal / coinCnt; // 코인한종목당 가격
 const targetRate = 0.6; // 수익률 1퍼센트 이상이면 일괄 매도
 
 const exceptionCoins = []; // 제외하고 싶은 코인
-const pricePerCoin = 500000; // 코인한종목당 가격
 
 let targetCoins = [];
 let account = {};

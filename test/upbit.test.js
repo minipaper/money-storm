@@ -29,7 +29,7 @@ describe('UPBIT', () => {
     });
   });
 
-  it.skip('추천 코인 찾기 로직테스트', async () => {
+  it('추천 코인 찾기 로직테스트', async () => {
     const markets = await upbit.getMarkets();
 
     const limit = 3; // 3개 찾기
@@ -43,13 +43,14 @@ describe('UPBIT', () => {
       // console.log(`체크중 ${m.korean_name} 찾은 개수 ${result.length}`);
       const hours = await upbit.getHeikinAshi(60, m.market, 4);
       if ((hours[1] === 'DOWN' && hours[2] === 'UP' && hours[3] === 'UP') || (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP' && hours[3] === 'UP')) {
-        console.log(`PASS ${i + 1}. ${m.korean_name}`);
-        result.push(m);
-        /*const thirty = await upbit.getHeikinAshi(15, m.market, 3);
-        if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
+        // console.log(`PASS ${i + 1}. ${m.korean_name}`);
+        // result.push(m);
+        const thirty = await upbit.getHeikinAshi(1, m.market, 2);
+        if (thirty[0] === 'UP' && thirty[1] === 'UP' /*&& thirty[2] === 'UP'*/) {
           // console.log(`30 mininutes Pass ${m.korean_name}`);
+          console.log(`PASS ${i + 1}. ${m.korean_name}`);
           result.push(m);
-        }*/
+        }
       } else {
         console.log(`SKIP ${i + 1}. ${m.korean_name}`);
       }
@@ -80,7 +81,7 @@ describe('UPBIT', () => {
     console.log(`총 수익금 ${util.addComma(sum)}원`);
   });
 
-  it('추천코인찾기', async () => {
+  it.skip('추천코인찾기', async () => {
     const exceptCoin = []; //['QTUM', 'BTT'];
     const market = await upbit.recommendCoins(5, exceptCoin, true);
     if (market.length === 0) {

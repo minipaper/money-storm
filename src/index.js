@@ -2,9 +2,10 @@ import schedule from 'node-schedule';
 import TelegramBot from 'node-telegram-bot-api';
 import upbit from './services/upbit';
 import util, { addComma, delay } from './services/util';
+import moment from 'moment';
 import { logger, tail } from './config/winston';
 
-const priceTotal = 1000000;
+const priceTotal = 2000000;
 let coinCnt = 4;
 const pricePerCoin = priceTotal / coinCnt; // 코인한종목당 가격
 const targetRate = 0.6; // 수익률 1퍼센트 이상이면 일괄 매도
@@ -20,7 +21,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
   bot.onText(/\/\?|help|도움말|h/, () => {
-    const command = ['도움말 : /help', 'Account : /info', 'bot시작 : /start', 'bot정지 : /stop', '로그 : /log', '일괄매도', '실행'];
+    const command = ['도움말 : /help', 'Account : /info', 'bot시작 : /start', 'bot정지 : /stop', '추천 : /추천', '로그 : /log', '일괄매도', '실행'];
     sayBot(command.join('\n\n'));
   });
   // info
@@ -39,6 +40,14 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     tail(lines).then((data) => {
       sayBot(`LOGS\n${data}`);
     });
+  });
+  // 추천
+  bot.onText(/\/추천/, async () => {
+    const market = await upbit.recommendCoins(3, [], true);
+    if (market.length === 0) {
+      sayBot('추천할 코인이 없습니다.');
+    }
+    sayBot(market.map((m) => `${m.korean_name}(${m.market})`).join(', '));
   });
   // 일괄매도
   bot.onText(/\/일괄매도/, async () => {
@@ -108,6 +117,7 @@ const main = async () => {
   // 전체 수익률 체크
   let proceeds = 0; // 전체수익금
   let rate = 0; // 전체수익률
+  const currentRate = {};
   if (coins.length === 0) {
     console.log(`소유한 코인이 없습니다.`);
   } else {
@@ -127,6 +137,9 @@ const main = async () => {
       // sum += result;
       내가산금액Sum += 내가산금액;
       현재금액Sum += 현재금액;
+
+      // 현재 코인
+      currentRate[coin] = ((현재금액 - 내가산금액) / 내가산금액) * 100;
     }
     if (coins.length > 0) {
       proceeds = 현재금액Sum - 내가산금액Sum;
@@ -143,12 +156,48 @@ const main = async () => {
   } else {
     //
     console.log('일괄매도 조건 안됨');
+    // 혼자서 2프로 이상 수익률이 있으면 익절
+    const rateCoins = Object.keys(currentRate);
+    for (let i = 0; i < rateCoins.length; i++) {
+      const rateCoin = rateCoins[i];
+      if (currentRate[rateCoin] >= 2) {
+        // 매도
+        const currentCoinTick = await upbit.getTicker(`KRW-${rateCoin}`);
+        const orderResponse = await upbit.order('SELL', account, currentCoinTick);
+        const { price, volume } = orderResponse;
+        const msg = `[2프로 수익달성] - 매도 ${rateCoin} ${addComma(price * volume)}원`;
+        logger.info(msg);
+        sayBot(msg);
+        // 급등 코인 당분간 BAN
+        exceptionCoins.push(rateCoin);
+        const minutes = 20 * 60 * 1000; // 20분 뒤까지 ban
+        setTimeout(() => {
+          const idx = exceptionCoins.indexOf(rateCoin);
+          exceptionCoins.splice(idx, 1);
+        }, minutes);
+        if (targetCoins.includes(rateCoin)) {
+          const idx = targetCoins.indexOf(rateCoin);
+          targetCoins.splice(idx, 1);
+        }
+
+        await delay(100);
+      }
+    }
+
     for (let i = 0; i < targetCoins.length; i++) {
       const targetCoin = targetCoins[i];
       if (account[targetCoin]) {
         // 코인이 있으면 skip
       } else {
         // 추천종목중 없는 코인 구매
+        // 9시부터 30분간 거래량이 튀어서 이상한거 살수있어서 막음
+        const now = moment();
+        const morning = moment().hour(9).minute(0).second(0);
+        if (now.isBetween(morning, morning.add(30, 'minutes'))) {
+          logger.info(`9시부터 9시 30분간 구매를 멈춥니다.`);
+          return;
+        }
+
         console.log(`코인 매수 진행 : ${targetCoin}`);
         const currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
         const orderResponse = await upbit.order('BUY', account, currentCoinTick, pricePerCoin);

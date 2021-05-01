@@ -124,7 +124,12 @@ const getCandlesMinutes = (unit = 5, market, count) => {
   };
   return http.get(`/v1/candles/minutes/${unit}`, { params }).then(({ data }) => data);
 };
-
+/**
+ * 하이킨 아시 봉 가져오기
+ * @param unit {number}분 단위. 가능한 값 : 1, 3, 5, 15, 10, 30, 60, 240
+ * @param market 마켓
+ * @param cnt 개수
+ */
 const getHeikinAshi = (unit, market, cnt) => {
   return new Promise((resolve) => {
     getCandlesMinutes(unit, market, 200).then((candles) => {

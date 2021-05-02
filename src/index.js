@@ -6,9 +6,10 @@ import moment from 'moment';
 import { logger, tail } from './config/winston';
 
 const priceTotal = 2000000;
-let coinCnt = 4;
+let coinCnt = 5;
 const pricePerCoin = priceTotal / coinCnt; // 코인한종목당 가격
-const targetRate = 0.6; // 수익률 1퍼센트 이상이면 일괄 매도
+const targetRate = 0.55; // 수익률 0.5퍼센트 이상이면 일괄 매도
+const targetRatePerCoin = 1.5; // 코인 한개당 수익매도 수익률
 
 const exceptionCoins = []; // 제외하고 싶은 코인
 
@@ -86,12 +87,17 @@ async function sellAll(coins) {
       const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
       const orderResponse = await upbit.order('SELL', account, currentCoinTick);
       const { price, volume } = orderResponse;
-      logger.info(`매도 ${coin} ${addComma(price * volume)}원`);
-      sayBot(`매도 ${coin} ${addComma(price * volume)}원`);
+
+      const msg = `매도 ${coin} ${addComma(price * volume)}원 평가손익 ${price * volume - pricePerCoin}원`;
+      logger.info(msg);
+      sayBot(msg);
       await delay(100);
     }
+    const idx = targetCoins.indexOf(coin);
+    if (idx > -1) {
+      targetCoins.splice(idx, 1);
+    }
   }
-  targetCoins = [];
 }
 
 const main = async () => {
@@ -144,15 +150,22 @@ const main = async () => {
     if (coins.length > 0) {
       proceeds = 현재금액Sum - 내가산금액Sum;
       rate = (proceeds / 내가산금액Sum) * 100;
-      console.log(`총 수익금 ${util.addComma(proceeds)}원`);
-      console.log(`총 수익률 ${rate}%`);
+      logger.info(`총 수익금 ${util.addComma(proceeds)}원 - 총 수익률 ${rate}%`);
     }
   }
 
-  // 전체 수익률이 1퍼센트 이상이면
+  // 전체 수익률이 지정된 수익 이상이면
   if (rate >= targetRate) {
     // 일괄매도
-    await sellAll(coins);
+    let recommend = await upbit.recommendCoins(coinCnt, [], true);
+    recommend = recommend.map((c) => c.market.replace('KRW-', '')).filter((c) => coins.includes(c));
+    if (recommend.length > 0) {
+      // 추천코인에 포함되어있으면 한틱 skip
+      // skip
+    } else {
+      await sellAll(coins);
+      logger.info(`총 수익금 ${util.addComma(proceeds)}원 - 총 수익률 ${rate}%`);
+    }
   } else {
     //
     console.log('일괄매도 조건 안됨');
@@ -160,17 +173,17 @@ const main = async () => {
     const rateCoins = Object.keys(currentRate);
     for (let i = 0; i < rateCoins.length; i++) {
       const rateCoin = rateCoins[i];
-      if (currentRate[rateCoin] >= 2) {
+      if (currentRate[rateCoin] >= targetRatePerCoin) {
         // 매도
         const currentCoinTick = await upbit.getTicker(`KRW-${rateCoin}`);
         const orderResponse = await upbit.order('SELL', account, currentCoinTick);
         const { price, volume } = orderResponse;
-        const msg = `[2프로 수익달성] - 매도 ${rateCoin} ${addComma(price * volume)}원`;
+        const msg = `[${targetRatePerCoin}프로 수익달성] - 매도 ${rateCoin} ${addComma(price * volume)}원`;
         logger.info(msg);
         sayBot(msg);
         // 급등 코인 당분간 BAN
         exceptionCoins.push(rateCoin);
-        const minutes = 20 * 60 * 1000; // 20분 뒤까지 ban
+        const minutes = 10 * 60 * 1000; // 10분 뒤까지 ban
         setTimeout(() => {
           const idx = exceptionCoins.indexOf(rateCoin);
           exceptionCoins.splice(idx, 1);
@@ -190,11 +203,12 @@ const main = async () => {
         // 코인이 있으면 skip
       } else {
         // 추천종목중 없는 코인 구매
-        // 9시부터 30분간 거래량이 튀어서 이상한거 살수있어서 막음
+        // 종목시작떄 거래량이 튀어서 이상한거 살수있어서 막음
         const now = moment();
-        const morning = moment().hour(9).minute(0).second(0);
-        if (now.isBetween(morning, morning.add(30, 'minutes'))) {
-          logger.info(`9시부터 9시 30분간 구매를 멈춥니다.`);
+        const periodA = moment().hour(8).minute(55).second(0);
+        const periodB = moment().hour(9).minute(30).second(0);
+        if (now.isBetween(periodA, periodB)) {
+          logger.info(`${periodA.format('LT')} 부터 ${periodB.format('LT')} 까지 구매를 멈춥니다.`);
           return;
         }
 

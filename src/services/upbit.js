@@ -36,7 +36,7 @@ const updateAccount = () => {
 /**
  업비트에서 거래 가능한 마켓 목록(원화마켓만) (거래량순)
  */
-const getMarkets = async () => {
+const getMarkets = async (cnt = 40) => {
   const { data } = await http.get(`/v1/market/all?isDetails=true`);
   const markets = data.filter((m) => m.market.includes('KRW-') && m['market_warning'] === 'NONE');
   await util.delay(200);
@@ -48,6 +48,9 @@ const getMarkets = async () => {
   markets.sort((m1, m2) => {
     return orderedMarket.indexOf(m1.market) - orderedMarket.indexOf(m2.market);
   });
+  if (markets.length > cnt) {
+    markets.length = cnt;
+  }
   return markets;
 };
 /**

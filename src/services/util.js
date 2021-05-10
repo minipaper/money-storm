@@ -2,7 +2,7 @@ export const addComma = (x) => {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
-export const delay = (milliseconds) => {
+export const delay = (milliseconds = 125) => {
   return new Promise((resolve) => setTimeout(() => resolve(), milliseconds));
 };
 

@@ -36,7 +36,7 @@ const updateAccount = () => {
 /**
  업비트에서 거래 가능한 마켓 목록(원화마켓만) (거래량순)
  */
-const getMarkets = async (cnt = 40) => {
+const getMarkets = async (cnt = 60) => {
   const { data } = await http.get(`/v1/market/all?isDetails=true`);
   const markets = data.filter((m) => m.market.includes('KRW-') && m['market_warning'] === 'NONE');
   await util.delay(200);
@@ -59,10 +59,9 @@ const getMarkets = async (cnt = 40) => {
  * @param exceptCoin 예외코인 ['BTC', 'ABC']
  * @param checkSecondCandle 두번째 봉까지 확인
  */
-const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true) => {
+const recommendCoins = async (cnt = 1, exceptCoin = []) => {
   // 거래하고 있는 모든 코인 조회
   let markets = await getMarkets();
-
   // 예외하고 싶은 코인
   if (exceptCoin.length > 0) {
     markets = markets.filter((m) => {
@@ -78,28 +77,15 @@ const recommendCoins = async (cnt = 1, exceptCoin = [], checkSecondCandle = true
       break;
     }
     const m = markets[i];
-    const hours = await getHeikinAshi(60, m.market, 4);
-    if ((hours[1] === 'DOWN' && hours[2] === 'UP' && hours[3] === 'UP') || (hours[0] === 'DOWN' && hours[1] === 'UP' && hours[2] === 'UP' && hours[3] === 'UP')) {
-      if (!checkSecondCandle) {
-        m.ticker = await getTicker(m.market);
-        await util.delay(100);
-        result.push(m);
-        continue;
-      }
-      // const thirty = await getHeikinAshi(15, m.market, 3);
-      // if (thirty[0] === 'DOWN' && thirty[1] === 'UP' && thirty[2] === 'UP') {
-      //   m.ticker = await getTicker(m.market);
-      //   result.push(m);
-      // }
-
-      const minute = await getHeikinAshi(1, m.market, 2);
-      await util.delay(100);
-      if (minute[0] === 'UP' && minute[1] === 'UP') {
-        m.ticker = await getTicker(m.market);
-        result.push(m);
-      }
+    const heikinAshi = await getHeikinAshi(15, m.market, 4);
+    // console.log(`탐색중 ${i + 1}.${m.market}`);
+    await util.delay();
+    if (heikinAshi[0].change === 'DOWN' && heikinAshi[1].change === 'DOWN' && heikinAshi[2].change === 'UP' && heikinAshi[3].change === 'UP') {
+      m.ticker = await getTicker(m.market);
+      m.heikinAshi = heikinAshi;
+      await util.delay();
+      result.push(m);
     }
-    await util.delay(100); // upbit request timeout
   }
 
   // order by 거래량 높은순
@@ -134,41 +120,43 @@ const getCandlesMinutes = (unit = 5, market, count) => {
  * @param cnt 개수
  */
 const getHeikinAshi = (unit, market, cnt) => {
-  return new Promise((resolve) => {
-    getCandlesMinutes(unit, market, 200).then((candles) => {
-      const items = HeikinAshi(
-        candles.reverse().map((bar) => {
-          const { trade_price, opening_price, high_price, low_price, timestamp, candle_acc_trade_volume, candle_date_time_kst } = bar;
+  return new Promise((resolve, reject) => {
+    getCandlesMinutes(unit, market, 200)
+      .then((candles) => {
+        const items = HeikinAshi(
+          candles.reverse().map((bar) => {
+            const { trade_price, opening_price, high_price, low_price, timestamp, candle_acc_trade_volume, candle_date_time_kst } = bar;
 
-          return {
-            time: timestamp,
-            close: trade_price,
-            high: high_price,
-            low: low_price,
-            open: opening_price,
-            volume: candle_acc_trade_volume,
-            kst_time: candle_date_time_kst,
-          };
-        }),
-        {
-          overWrite: false, //overwrites the original data or create a new array
-          formatNumbers: false, //formats the numbers and reduces their significant digits based on the values
-          decimals: 4, //number of significant digits
-          forceExactDecimals: false, //force the number of significant digits or reduce them if the number is high
-        }
-      ).map((item) => {
-        if (item.close > item.open) {
-          item.change = 'UP';
-        } else if (item.close < item.open) {
-          item.change = 'DOWN';
-        } else {
-          item.change = 'SAME';
-        }
-        return item;
-      });
-      items.splice(0, items.length - cnt);
-      resolve(items.map((item) => item.change));
-    });
+            return {
+              time: timestamp,
+              close: trade_price,
+              high: high_price,
+              low: low_price,
+              open: opening_price,
+              volume: candle_acc_trade_volume,
+              kst_time: candle_date_time_kst,
+            };
+          }),
+          {
+            overWrite: false, //overwrites the original data or create a new array
+            formatNumbers: false, //formats the numbers and reduces their significant digits based on the values
+            decimals: 4, //number of significant digits
+            forceExactDecimals: false, //force the number of significant digits or reduce them if the number is high
+          }
+        ).map((item) => {
+          if (item.close > item.open) {
+            item.change = 'UP';
+          } else if (item.close < item.open) {
+            item.change = 'DOWN';
+          } else {
+            item.change = 'SAME';
+          }
+          return item;
+        });
+        items.splice(0, items.length - cnt);
+        resolve(items);
+      })
+      .catch((err) => reject(err));
   });
 };
 

@@ -29,7 +29,7 @@ describe('UPBIT', () => {
     });
   });
 
-  it('추천 코인 찾기 로직테스트', async () => {
+  it.skip('추천 코인 찾기 로직테스트', async () => {
     const markets = await upbit.getMarkets();
 
     const limit = 3; // 3개 찾기
@@ -83,15 +83,25 @@ describe('UPBIT', () => {
 
   it.skip('추천코인찾기', async () => {
     const exceptCoin = []; //['QTUM', 'BTT'];
-    const market = await upbit.recommendCoins(5, exceptCoin, true);
+    const market = await upbit.recommendCoins(4, exceptCoin, true);
     if (market.length === 0) {
       console.log('추천할 코인이 없습니다.');
     }
     console.log(market.map((m) => `${m.korean_name}(${m.market})`).join(', '));
-  }).timeout(40 * 1000);
+  }).timeout(60 * 1000);
 
   it.skip('채결강도', async () => {
     // const market = await upbit.getTickers(['KRW-MANA']);
     // console.log(market);
+  });
+
+  it.skip('거래량 마켓', async () => {
+    const markets = await upbit.getMarkets(10);
+    console.log(markets.map((m) => m.korean_name).join(', '));
+  });
+
+  it('하이킨아시', async () => {
+    const result = await upbit.getHeikinAshi(5, 'KRW-BTC', 4);
+    console.log(result);
   });
 });

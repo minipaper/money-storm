@@ -21,6 +21,7 @@
     "dotenv": "^8.2.0",
     "heikinashi": "^1.0.6",
     "jsonwebtoken": "^8.5.1",
+    "lowdb": "^1.0.0",
     "moment": "^2.29.1",
     "node-schedule": "^2.0.0",
     "node-telegram-bot-api": "^0.52.0",

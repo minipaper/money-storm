@@ -1,60 +1,33 @@
 import schedule from 'node-schedule';
 import TelegramBot from 'node-telegram-bot-api';
 import upbit from './services/upbit';
-import util, { addComma, delay } from './services/util';
-import moment from 'moment';
+import util, { addComma } from './services/util';
 import { logger, tail } from './config/winston';
-
-const priceTotal = 2000000;
-let coinCnt = 5;
-const pricePerCoin = priceTotal / coinCnt; // 코인한종목당 가격
-const targetRate = 0.55; // 수익률 0.5퍼센트 이상이면 일괄 매도
-const targetRatePerCoin = 1.5; // 코인 한개당 수익매도 수익률
-
-const exceptionCoins = []; // 제외하고 싶은 코인
-
-let targetCoins = [];
-let account = {};
-let isWorking = true;
+import db from './config/db';
 
 let bot;
 if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKEN) {
   bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
   // 정보
   bot.onText(/\/\?|help|도움말|h/, () => {
-    const command = ['도움말 : /help', 'Account : /info', 'bot시작 : /start', 'bot정지 : /stop', '추천 : /추천', '로그 : /log', '일괄매도', '실행'];
+    const command = [];
+    command.push('도움말 : /help');
+    command.push('로그 : /log');
+    command.push('봇시작 : /start');
+    command.push('봇중단 : /stop');
     sayBot(command.join('\n\n'));
   });
   // info
   bot.onText(/\/info/, () => {
-    const info = {
-      account,
-      targetCoins,
-      isWorking,
-      exceptionCoins,
-    };
+    const info = {};
     sayBot(`INFO\n${JSON.stringify(info, null, 2)}`);
   });
   // log
   bot.onText(/\/log[\s]?(\d+)?/, (msg, match) => {
-    const lines = match[1] ? match[1] * 1 : (targetCoins.length + 1) * 2;
+    const lines = match[1] ? match[1] * 1 : 20;
     tail(lines).then((data) => {
       sayBot(`LOGS\n${data}`);
     });
-  });
-  // 추천
-  bot.onText(/\/추천/, async () => {
-    const market = await upbit.recommendCoins(3, [], true);
-    if (market.length === 0) {
-      sayBot('추천할 코인이 없습니다.');
-    }
-    sayBot(market.map((m) => `${m.korean_name}(${m.market})`).join(', '));
-  });
-  // 일괄매도
-  bot.onText(/\/일괄매도/, async () => {
-    account = await upbit.updateAccount();
-    const coins = Object.keys(account).filter((c) => c !== 'KRW');
-    await sellAll(coins);
   });
   bot.onText(/\/stop/, () => {
     isWorking = false;
@@ -76,40 +49,26 @@ const sayBot = (message) => {
   }
 };
 
-async function sellAll(coins) {
-  // 일괄매도
-  logger.info(`일괄매도를 진행합니다.\n${coins.join(',')}`);
-  sayBot(`일괄매도를 진행합니다.\n${coins.join(',')}`);
-  for (let i = 0; i < coins.length; i++) {
-    const coin = coins[i];
-    if (account[coin]) {
-      // 매도
-      const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-      const orderResponse = await upbit.order('SELL', account, currentCoinTick);
-      const { price, volume } = orderResponse;
-
-      const msg = `매도 ${coin} ${addComma(price * volume)}원 평가손익 ${price * volume - pricePerCoin}원`;
-      logger.info(msg);
-      sayBot(msg);
-      await delay(100);
-    }
-    const idx = targetCoins.indexOf(coin);
-    if (idx > -1) {
-      targetCoins.splice(idx, 1);
-    }
-  }
-}
+/************************
+ * 변수 설정
+ ************************/
+const pricePerCoin = 1 * 10000;
+let coinCnt = 5;
+let account = {};
+// let targetCoins = ['BTC', 'BCH', 'ETH', 'ETC', 'DOT'];
+let targetCoins = [];
+const exceptionCoins = ['BTT', 'ETC', 'DOGE']; // 제외하고 싶은 코인
+let isWorking = true;
 
 const main = async () => {
   if (!isWorking) return;
-  // 로직 시작
   account = await upbit.updateAccount();
+  // 보유코인
   let coins = Object.keys(account).filter((c) => c !== 'KRW');
   if (coinCnt > coins.length) {
     // 추천 코인 추가
-    console.info('추천코인추가');
     const exception = [...coins, ...exceptionCoins]; // 기존 가지고있는 코인
-    let recommend = await upbit.recommendCoins(coinCnt - coins.length, exception, true);
+    let recommend = await upbit.recommendCoins(coinCnt - coins.length, exception);
     recommend = recommend.map((c) => c.market.replace('KRW-', ''));
     logger.info(`추천코인 ${JSON.stringify(recommend)}`);
     targetCoins = [...targetCoins, ...recommend];
@@ -120,133 +79,65 @@ const main = async () => {
     }
   }
 
-  // 전체 수익률 체크
-  let proceeds = 0; // 전체수익금
-  let rate = 0; // 전체수익률
-  const currentRate = {};
-  if (coins.length === 0) {
-    console.log(`소유한 코인이 없습니다.`);
-  } else {
-    const snapshot = await upbit.getTickers(coins.map((coin) => `KRW-${coin}`));
-    // let sum = 0;
-    let 내가산금액Sum = 0;
-    let 현재금액Sum = 0;
-    for (let i = 0; i < coins.length; i++) {
-      const coin = coins[i];
-      const { balance, avg_buy_price } = account[coin];
-      const ticker = snapshot.find((m) => m.market === `KRW-${coin}`);
-      const 내가산금액 = balance * avg_buy_price;
-      const 현재금액 = balance * ticker.trade_price;
+  for (let i = 0; i < targetCoins.length; i++) {
+    const coin = targetCoins[i];
+    if (exceptionCoins.includes(coin)) continue;
 
-      const result = 현재금액 - 내가산금액;
-      console.log(`수익금 ${coin} : ${result}원`);
-      // sum += result;
-      내가산금액Sum += 내가산금액;
-      현재금액Sum += 현재금액;
-
-      // 현재 코인
-      currentRate[coin] = ((현재금액 - 내가산금액) / 내가산금액) * 100;
-    }
-    if (coins.length > 0) {
-      proceeds = 현재금액Sum - 내가산금액Sum;
-      rate = (proceeds / 내가산금액Sum) * 100;
-      logger.info(`총 수익금 ${util.addComma(proceeds)}원 - 총 수익률 ${rate}%`);
-    }
-  }
-
-  // 전체 수익률이 지정된 수익 이상이면
-  if (rate >= targetRate) {
-    // 일괄매도
-    let recommend = await upbit.recommendCoins(coinCnt, [], true);
-    recommend = recommend.map((c) => c.market.replace('KRW-', '')).filter((c) => coins.includes(c));
-    if (recommend.length > 0) {
-      // 추천코인에 포함되어있으면 한틱 skip
-      // skip
-    } else {
-      await sellAll(coins);
-      logger.info(`총 수익금 ${util.addComma(proceeds)}원 - 총 수익률 ${rate}%`);
-    }
-  } else {
-    //
-    console.log('일괄매도 조건 안됨');
-    // 혼자서 2프로 이상 수익률이 있으면 익절
-    const rateCoins = Object.keys(currentRate);
-    for (let i = 0; i < rateCoins.length; i++) {
-      const rateCoin = rateCoins[i];
-      if (currentRate[rateCoin] >= targetRatePerCoin) {
-        // 매도
-        const currentCoinTick = await upbit.getTicker(`KRW-${rateCoin}`);
-        const orderResponse = await upbit.order('SELL', account, currentCoinTick);
+    const heikin = await upbit.getHeikinAshi(15, `KRW-${coin}`, 4);
+    await util.delay();
+    if (account[coin]) {
+      // 매도체크
+      // 1. UP - UP - DOWN - DOWN 일때 판다
+      if (heikin[0].change === 'UP' && heikin[1].change === 'UP' && heikin[2].change === 'DOWN' && heikin[3].change === 'DOWN') {
+        console.log('매도', coin);
+        const ticker = await upbit.getTicker(`KRW-${coin}`);
+        const orderResponse = await upbit.order('SELL', account, ticker);
         const { price, volume } = orderResponse;
-        const msg = `[${targetRatePerCoin}프로 수익달성] - 매도 ${rateCoin} ${addComma(price * volume)}원`;
+        const msg = `매도 ${coin} ${addComma(price * volume)}원`;
+
         logger.info(msg);
         sayBot(msg);
-        // 급등 코인 당분간 BAN
-        exceptionCoins.push(rateCoin);
-        const minutes = 10 * 60 * 1000; // 10분 뒤까지 ban
-        setTimeout(() => {
-          const idx = exceptionCoins.indexOf(rateCoin);
-          exceptionCoins.splice(idx, 1);
-        }, minutes);
-        if (targetCoins.includes(rateCoin)) {
-          const idx = targetCoins.indexOf(rateCoin);
-          targetCoins.splice(idx, 1);
-        }
 
-        await delay(100);
+        db.get('orders').remove({ name: coin }).write();
+        continue;
       }
-    }
+      // 2. 혹은 손절가가 지정되어있는 경우 아래인 경우 판다
+      const item = db.get('orders').find({ name: coin }).value();
+      if (item && item.stopLoss) {
+        const ticker = await upbit.getTicker(`KRW-${coin}`);
+        await util.delay();
+        const tradePrice = ticker['trade_price'];
+        if (tradePrice < item.stopLoss) {
+          console.log('매도', coin);
+          const orderResponse = await upbit.order('SELL', account, ticker);
+          const { price, volume } = orderResponse;
+          const msg = `손절가 매도 ${coin} ${addComma(price * volume)}원`;
 
-    for (let i = 0; i < targetCoins.length; i++) {
-      const targetCoin = targetCoins[i];
-      if (account[targetCoin]) {
-        // 코인이 있으면 skip
-      } else {
-        // 추천종목중 없는 코인 구매
-        // 종목시작떄 거래량이 튀어서 이상한거 살수있어서 막음
-        const now = moment();
-        const periodA = moment().hour(8).minute(55).second(0);
-        const periodB = moment().hour(9).minute(30).second(0);
-        if (now.isBetween(periodA, periodB)) {
-          logger.info(`${periodA.format('LT')} 부터 ${periodB.format('LT')} 까지 구매를 멈춥니다.`);
-          return;
+          logger.info(msg);
+          sayBot(msg);
+
+          db.get('orders').remove({ name: coin }).write();
         }
-
-        console.log(`코인 매수 진행 : ${targetCoin}`);
-        const currentCoinTick = await upbit.getTicker(`KRW-${targetCoin}`);
+      }
+    } else {
+      // 매수 체크
+      // 1. DOWN - DOWN - UP - UP 일 경우 산다
+      if (heikin[0].change === 'DOWN' && heikin[1].change === 'DOWN' && heikin[2].change === 'UP' && heikin[3].change === 'UP') {
+        console.log('매수', coin);
+        const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
         const orderResponse = await upbit.order('BUY', account, currentCoinTick, pricePerCoin);
         const { price, volume } = orderResponse;
-        logger.info(`매수 ${targetCoin} ${JSON.stringify(orderResponse)}`);
-        sayBot(`매수 ${targetCoin} ${addComma(price * volume)}원`);
-        await delay(300);
-      }
-    }
+        logger.info(`매수 ${coin} ${JSON.stringify(orderResponse)}`);
+        sayBot(`매수 ${coin} ${addComma(price * volume)}원`);
+        await util.delay(300);
 
-    // 급락하는 코인 찾아서 손절
-    for (let i = 0; i < coins.length; i++) {
-      const coin = coins[i];
-      console.log(`급락체크 중 ${coin}`);
-      const hours = await upbit.getHeikinAshi(60, `KRW-${coin}`, 3);
-      if (hours[0] === 'UP' && hours[1] === 'DOWN' && hours[2] === 'DOWN') {
-        // 매도
-        const currentCoinTick = await upbit.getTicker(`KRW-${coin}`);
-        const orderResponse = await upbit.order('SELL', account, currentCoinTick);
-        const { price, volume } = orderResponse;
-        const msg = `[급락] - 매도 ${coin} ${addComma(price * volume)}원`;
-        // 급락 코인 당분간 BAN
-        exceptionCoins.push(coin);
-        const minutes = 70 * 60 * 1000; // 70분 뒤까지 ban
-        setTimeout(() => {
-          const idx = exceptionCoins.indexOf(coin);
-          exceptionCoins.splice(idx, 1);
-        }, minutes);
-        if (targetCoins.includes(coin)) {
-          const idx = targetCoins.indexOf(coin);
-          targetCoins.splice(idx, 1);
-        }
-        logger.info(msg);
-        sayBot(msg);
-        await delay(300);
+        // 2. 이때 손절가도 같이 세팅 DOWN DOWN 중 Math.Min(haLow) 으로 세팅
+        db.get('orders')
+          .push({
+            name: coin,
+            stopLoss: Math.min(heikin[0].low, heikin[1].low),
+          })
+          .write();
       }
     }
   }
@@ -263,7 +154,7 @@ const main = async () => {
 │    └──────────────────── minute (0 - 59)
 └───────────────────────── second (0 - 59, OPTIONAL)*/
 // 1분마다 체크
-schedule.scheduleJob('20 * * * * *', (fireDate) => {
+schedule.scheduleJob('10 * * * * *', (fireDate) => {
   logger.info(`RUN ${fireDate}`);
   main().catch((err) => {
     logger.error(err);

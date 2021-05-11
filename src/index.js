@@ -13,6 +13,7 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     const command = [];
     command.push('도움말 : /help');
     command.push('로그 : /log');
+    command.push('손절가 : /stoploss');
     command.push('봇시작 : /start');
     command.push('봇중단 : /stop');
     sayBot(command.join('\n\n'));
@@ -28,6 +29,10 @@ if (process.env.TELEGRAM_BOT_ENABLED === 'true' && process.env.TELEGRAM_BOT_TOKE
     tail(lines).then((data) => {
       sayBot(`LOGS\n${data}`);
     });
+  });
+  bot.onText(/\/stoploss/, () => {
+    const items = db.get('orders').value();
+    sayBot(`손절가\n${JSON.stringify(items, null, 2)}`);
   });
   bot.onText(/\/stop/, () => {
     isWorking = false;
@@ -54,6 +59,7 @@ const sayBot = (message) => {
  ************************/
 const pricePerCoin = 1 * 10000;
 let coinCnt = 5;
+let bunbong = 15;
 let account = {};
 // let targetCoins = ['BTC', 'BCH', 'ETH', 'ETC', 'DOT'];
 let targetCoins = [];
@@ -83,7 +89,7 @@ const main = async () => {
     const coin = targetCoins[i];
     if (exceptionCoins.includes(coin)) continue;
 
-    const heikin = await upbit.getHeikinAshi(15, `KRW-${coin}`, 4);
+    const heikin = await upbit.getHeikinAshi(bunbong, `KRW-${coin}`, 4);
     await util.delay();
     if (account[coin]) {
       // 매도체크
@@ -94,6 +100,17 @@ const main = async () => {
         const orderResponse = await upbit.order('SELL', account, ticker);
         const { price, volume } = orderResponse;
         const msg = `매도 ${coin} ${addComma(price * volume)}원`;
+
+        exceptionCoins.push(coin);
+        const minutes = bunbong * 2 * 60 * 1000; // 분봉2배만큼
+        setTimeout(() => {
+          const idx = exceptionCoins.indexOf(coin);
+          exceptionCoins.splice(idx, 1);
+        }, minutes);
+        if (targetCoins.includes(coin)) {
+          const idx = targetCoins.indexOf(coin);
+          targetCoins.splice(idx, 1);
+        }
 
         logger.info(msg);
         sayBot(msg);
@@ -112,6 +129,17 @@ const main = async () => {
           const orderResponse = await upbit.order('SELL', account, ticker);
           const { price, volume } = orderResponse;
           const msg = `손절가 매도 ${coin} ${addComma(price * volume)}원`;
+
+          exceptionCoins.push(coin);
+          const minutes = bunbong * 2 * 60 * 1000; // 분봉2배만큼
+          setTimeout(() => {
+            const idx = exceptionCoins.indexOf(coin);
+            exceptionCoins.splice(idx, 1);
+          }, minutes);
+          if (targetCoins.includes(coin)) {
+            const idx = targetCoins.indexOf(coin);
+            targetCoins.splice(idx, 1);
+          }
 
           logger.info(msg);
           sayBot(msg);

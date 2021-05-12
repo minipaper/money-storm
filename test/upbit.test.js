@@ -1,7 +1,10 @@
+/* eslint-disable no-undef */
 import 'babel-polyfill'; // mocha에서 async await 지원
 import assert from 'assert';
 import upbit from '../src/services/upbit';
 import util from '../src/services/util';
+import db from '../src/config/db';
+import moment from 'moment';
 
 describe('UPBIT', () => {
   let account = null;
@@ -100,8 +103,42 @@ describe('UPBIT', () => {
     console.log(markets.map((m) => m.korean_name).join(', '));
   });
 
-  it('하이킨아시', async () => {
+  it.skip('하이킨아시', async () => {
     const result = await upbit.getHeikinAshi(5, 'KRW-BTC', 4);
     console.log(result);
+  });
+
+  it.skip('손절 테스트', async () => {
+    const coin = 'WAVES';
+    const item = db.get('orders').find({ name: coin }).value();
+    if (item && item.stopLoss) {
+      const ticker = await upbit.getTicker(`KRW-${coin}`);
+      await util.delay();
+      const tradePrice = ticker['trade_price'];
+      if (tradePrice < item.stopLoss) {
+        console.log('매도', coin);
+        console.log('tradePrice', tradePrice);
+        console.log('item.stopLoss', item.stopLoss);
+      }
+    }
+  });
+
+  it('moment 테스트', () => {
+    const d = moment().format('YYYYMMDD');
+    console.log(d);
+  });
+
+  it('DB TEST', () => {
+    const day = moment().format('YYYYMMDD');
+    const msgs = [];
+    const items = db.get('history').value();
+    const item = items.find((item) => item.day === day);
+    console.log('items', items);
+    if (item) {
+      msgs.push(`${moment().format('YYYY년 MM월 DD일')}\n수익금 ${util.printCash(item.profit)}원`);
+    }
+    const total = items.reduce((a, b) => a + b.profit, 0);
+    msgs.push(`봇으로 계산된 전체 수익금 ${util.printCash(total)}원`);
+    console.log(msgs.join('\n'));
   });
 });

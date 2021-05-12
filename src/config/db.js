@@ -4,6 +4,7 @@ import FileSync from 'lowdb/adapters/FileSync';
 const db = low(new FileSync('db.json'));
 const init = {
   orders: [],
+  history: [],
 };
 
 db.defaults(init).write();
